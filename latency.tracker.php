@@ -3,7 +3,7 @@
 Plugin Name: Latency Tracker
 Plugin URI: http://skfox.com/2008/10/09/latency-tracker-phpmysql-tracking-for-wordpress/
 Description: Keeps track of the queries and time to load Wordpress. <a href="edit.php?page=latency.tracker">View your data</a>.
-Version: 2.0.8
+Version: 2.0.9
 Author: Shaun Kester
 Author URI: http://skfox.com
 */
@@ -30,7 +30,8 @@ include("FusionCharts/FusionCharts.php");
 
 
 // Run on plugin activation
-function lt_install () {
+function lt_install () 
+{
 	global $wpdb;
 	
 	// Create the tracking table
@@ -53,7 +54,7 @@ function lt_install () {
 		'lt_graph_width' => '650',
 		'lt_graph_height' => '450',
 		'lt_recent_requests' => '50',
-		'lt_max_records' => '500'
+		'lt_max_records' => 500
 	);
 	add_option('plugin_latencytracker_settings', $lt_options);
 	
@@ -62,7 +63,8 @@ function lt_install () {
 }
 
 // Run on plugin deactivation
-function lt_uninstall () {
+function lt_uninstall () 
+{
 	global $wpdb;
 	
 	//Drop the table that we created
@@ -80,7 +82,8 @@ function lt_uninstall () {
 
 // This is the function that stores your tracking data to mySQL
 // Bound to wp_footer() function. Won't work unless the theme calls wp_footer
-function lt_store_timer_data()  {
+function lt_store_timer_data()
+{
 	global $wpdb;
 	$table_name = lt_get_table_name();
 	$lt_data = array(
@@ -93,10 +96,17 @@ function lt_store_timer_data()  {
 }
 
 // Displays the panel at WP-Admin >> Manage >> Latency Tracker
-function lt_manage_panel() {
+function lt_manage_panel() 
+{
 	global $wpdb;
 	$table_name = lt_get_table_name();
 	$to_average = 0;
+
+	// Run any optional commands
+	if ( $_REQUEST['doClearOverage'] == 'yes' ) {
+		do_action('lt_clear_max');
+		$message = '<div id="message" class="updated fade"><p><strong>The records overage has been cleared</strong></p></div>';
+	}	
 	
 	// Get the options array
 	$options = get_option('plugin_latencytracker_settings');
@@ -121,13 +131,12 @@ function lt_manage_panel() {
 	// Start the page content
 	echo '<div id="divLatencyTrackerContent" class="wrap">';
 	echo '<h2>Latency Tracker</h2>';	
-	
+	echo $message;
 	if($record_count == 0){		
 		echo '<p>Not enough records yet, give it some time.</p>';		
 		echo '</div>';
 		return;	
-	}	
-	
+	}
 	echo '<p>This plugin tracks the number of queries and processing time for those queries for each hit to Wordpress.</p>';
 	echo '<div class="tabmenu">';
 	echo '<ul>';
@@ -203,20 +212,34 @@ function lt_manage_panel() {
 	
 	//End the page content
 	echo '</div>';
-	echo '<p><i>Records: '. $record_count .'</i></p>';
+	if ($record_count > $options['lt_max_records'])
+	{
+		echo '<p style="color: red"><i>Records: '. $record_count .'</i></p>';
+	}
+	else 
+	{
+		echo '<p><i>Records: '. $record_count .'</i></p>';
+	}
+	echo '<hr />';
+	echo '<form method="post">';                                            
+	echo '<input type="hidden" name="doClearOverage" value="yes">';
+	echo '<p class="submit"><input type="submit" class="button-primary" value="Clear records overage" /></p>';
+	echo '</form>';	
 	echo '<script type="text/javascript">jQuery("#divLatencyTrackerContent ul").idTabs(); jQuery("#tblRecentRequests").tablesorter( {sortList: [[0,1]]} ); </script>';
 }
 
 // Displays the panel at WP-Admin >> Settings >> LT Settings
-function lt_settings_panel() {
-
+function lt_settings_panel() 
+{
+	$message = '';
+	
 	// Save the options
 	if( isset($_POST['info_update']) ) 
 	{
 		check_admin_referer('lt_settings_panel_update_options');
 		$new_options = $_POST['latencytracker'];
 		update_option( 'plugin_latencytracker_settings', $new_options);
-		echo '<div id="message" class="updated fade"><p><strong>' . __('Settings saved.') . '</strong></p></div>';
+		$message = '<div id="message" class="updated fade"><p><strong>' . __('Settings saved.') . '</strong></p></div>';
 	}
 	else
 	{
@@ -225,9 +248,9 @@ function lt_settings_panel() {
 	
 	// Get the options array
 	$options = get_option('plugin_latencytracker_settings');	
-	
 	echo '<div class="wrap">';
 	echo '<h2>Latency Tracker Settings</h2>';
+	echo $message;
 	echo '<form method="post">';
 		wp_nonce_field('lt_settings_panel_update_options');
 		echo '<table class="form-table">';
@@ -255,19 +278,25 @@ function lt_settings_panel() {
 	echo '</div>';
 }
 
-function lt_clear_max_run() {
+function lt_clear_max_run() 
+{
+	global $wpdb;
+	
 	$table_name = lt_get_table_name();
 	
 	// Get the options array
-	$options = get_option('plugin_latencytracker_settings');			
+	$options = get_option('plugin_latencytracker_settings');
 	
 	// Get the record count 
 	$record_count = lt_get_record_count();
 	
 	if ($record_count > $options['lt_max_records'])
+	{
 		// Delete the overage
 		$record_overage = $record_count - $options['lt_max_records'];
-		$wpdb->query("DELETE FROM $table_name ORDER BY ID ASC LIMIT $record_overage");
+		$query = "DELETE FROM " .$table_name ." ORDER BY ID ASC LIMIT ".$record_overage;
+		$query_result = $wpdb->query($query);
+	}	
 }
 
 function lt_get_table_name() 
@@ -289,10 +318,10 @@ function lt_get_record_count()
 // Add new admin panels
 function lt_add_admin_panels() {
 	// WP-Admin >> Tools >> Latency Tracker
-  add_management_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_manage_panel');
-  
+	add_management_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_manage_panel');
+
 	// WP-Admin >> Settings >> LT Settings
-	add_options_page('LT Settings', 'LT Settings', 8,  basename(__FILE__), 'lt_settings_panel');
+	add_options_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_settings_panel');
 }
 
 // Add admin menu hook
