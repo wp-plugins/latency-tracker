@@ -3,7 +3,7 @@
 Plugin Name: Latency Tracker
 Plugin URI: http://skfox.com/2008/10/09/latency-tracker-phpmysql-tracking-for-wordpress/
 Description: Keeps track of the queries and time to load Wordpress. <a href="edit.php?page=latency.tracker">View your data</a>.
-Version: 2.0.9
+Version: 2.0.10
 Author: Shaun Kester
 Author URI: http://skfox.com
 */
@@ -215,16 +215,16 @@ function lt_manage_panel()
 	if ($record_count > $options['lt_max_records'])
 	{
 		echo '<p style="color: red"><i>Records: '. $record_count .'</i></p>';
+		echo '<form method="post">';                                            
+		echo '<input type="hidden" name="doClearOverage" value="yes">';
+		echo '<p class="submit"><input type="submit" class="button-primary" value="Clear records overage" /></p>';
+		echo '</form>';			
 	}
 	else 
 	{
 		echo '<p><i>Records: '. $record_count .'</i></p>';
 	}
 	echo '<hr />';
-	echo '<form method="post">';                                            
-	echo '<input type="hidden" name="doClearOverage" value="yes">';
-	echo '<p class="submit"><input type="submit" class="button-primary" value="Clear records overage" /></p>';
-	echo '</form>';	
 	echo '<script type="text/javascript">jQuery("#divLatencyTrackerContent ul").idTabs(); jQuery("#tblRecentRequests").tablesorter( {sortList: [[0,1]]} ); </script>';
 }
 
