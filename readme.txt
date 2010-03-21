@@ -3,7 +3,7 @@ Contributors: sdkester
 Tags: admin, database, performance, tracking
 Requires at least: 2.8
 Tested up to: 2.9.2
-Stable tag: 2.0.10
+Stable tag: 2.1
 
 Keeps track of the queries and loading time of your Wordpress site.
 
@@ -24,6 +24,11 @@ The Latency Tracker plugin counts the number of database calls and speed of your
 
 
 == Changelog ==
+
+= 2.1 =
+* Store and view user agent of each request
+* Switch to use of Wordpress standard scripts and CSS
+* Fixed table striping
 
 = 2.0.10 =
 * Only show button if overage exists

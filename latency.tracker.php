@@ -3,7 +3,7 @@
 Plugin Name: Latency Tracker
 Plugin URI: http://skfox.com/2008/10/09/latency-tracker-phpmysql-tracking-for-wordpress/
 Description: Keeps track of the queries and time to load Wordpress. <a href="edit.php?page=latency.tracker">View your data</a>.
-Version: 2.0.10
+Version: 2.1
 Author: Shaun Kester
 Author URI: http://skfox.com
 */
@@ -43,6 +43,7 @@ function lt_install ()
 		qcount mediumint(16) NOT NULL,
 		qtime float NOT NULL,
 		qpage varchar(255) NOT NULL,
+		useragent varchar(255) NOT NULL,
 		UNIQUE KEY id (id)
 		);";
 		require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
@@ -90,7 +91,8 @@ function lt_store_timer_data()
 		'longdatetime' => date('Y-m-d H:i:s', time()),
 		'qcount' => get_num_queries(),
 		'qtime' => timer_stop(0,3),
-		'qpage' => "http://".$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']
+		'qpage' => "http://".$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'],
+		'useragent' => $_SERVER['HTTP_USER_AGENT']
 	);	
 	$wpdb->insert($table_name, $lt_data);
 }
@@ -106,7 +108,7 @@ function lt_manage_panel()
 	if ( $_REQUEST['doClearOverage'] == 'yes' ) {
 		do_action('lt_clear_max');
 		$message = '<div id="message" class="updated fade"><p><strong>The records overage has been cleared</strong></p></div>';
-	}	
+	}
 	
 	// Get the options array
 	$options = get_option('plugin_latencytracker_settings');
@@ -120,13 +122,6 @@ function lt_manage_panel()
 
 	// Get min, max, and average for qtime and qcount
 	$statistic = $wpdb->get_row("SELECT max(qtime) as max_time,min(qtime) as min_time,avg(qtime) as avg_time,max(qcount) as max_queries,min(qcount) as min_queries,avg(qcount) as avg_queries FROM $table_name");
-	
-	// Javascript and CSS	
-	echo '<SCRIPT LANGUAGE="Javascript" SRC="'.plugins_url( 'FusionCharts/FusionCharts.js', __FILE__ ).'"></SCRIPT>';
-	echo '<SCRIPT LANGUAGE="Javascript" SRC="'.plugins_url( 'js/jquery.idtabs.js', __FILE__ ).'"></SCRIPT>';
-	echo '<SCRIPT LANGUAGE="Javascript" SRC="'.plugins_url( 'js/jquery.tablesorter.min.js', __FILE__ ).'"></SCRIPT>';
-	echo '<link rel="stylesheet" type="text/css" media="screen" href="'.plugins_url( 'css/tabmenu.css', __FILE__ ).'" />';
-	echo '<link rel="stylesheet" type="text/css" media="screen" href="'.plugins_url( 'css/jquery.tablesorter.css', __FILE__ ).'" />';
 
 	// Start the page content
 	echo '<div id="divLatencyTrackerContent" class="wrap">';
@@ -178,7 +173,7 @@ function lt_manage_panel()
 				echo "<td>Not enough requests yet...</td>";
 			echo "<td>".number_format($statistic->avg_time,3)."</td>";
 			echo "</tr>"; 
-		echo "</table>";
+		echo "</table>";	
 	echo '</div>';
 	
 	// Graph tab
@@ -198,10 +193,10 @@ function lt_manage_panel()
 		echo "<thead><tr><th>Date / Time</th><th>Page</th><th>Queries</th><th>Time</th></tr></thead>";
 		echo '<tbody>';
 		foreach ($recent_results as $recent_result) {
-			$class = 'alternate' == $class ? '' : 'alternate';
+			$class = 'odd' == $class ? '' : 'odd';
 			echo "<tr class='$class'>";
 			echo "<td>".$recent_result->longdatetime."</td>";
-			echo "<td><a href='".$recent_result->qpage."'>".$recent_result->qpage."</a></td>";
+			echo "<td><a href='".$recent_result->qpage."'>".$recent_result->qpage."</a><br>".$recent_result->useragent."</td>";
 			echo "<td>".$recent_result->qcount."</td>";
 			echo "<td>".$recent_result->qtime."</td>";
 			echo "</tr>";
@@ -225,7 +220,6 @@ function lt_manage_panel()
 		echo '<p><i>Records: '. $record_count .'</i></p>';
 	}
 	echo '<hr />';
-	echo '<script type="text/javascript">jQuery("#divLatencyTrackerContent ul").idTabs(); jQuery("#tblRecentRequests").tablesorter( {sortList: [[0,1]]} ); </script>';
 }
 
 // Displays the panel at WP-Admin >> Settings >> LT Settings
@@ -318,13 +312,39 @@ function lt_get_record_count()
 // Add new admin panels
 function lt_add_admin_panels() {
 	// WP-Admin >> Tools >> Latency Tracker
-	add_management_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_manage_panel');
-
+	$page = add_management_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_manage_panel');
+	
 	// WP-Admin >> Settings >> LT Settings
-	add_options_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_settings_panel');
+	add_options_page('Latency Tracker', 'Latency Tracker', 8,  basename(__FILE__), 'lt_settings_panel');	
+
+	// Load styles and scripts for our page, and our page only
+	add_action('admin_print_styles-' . $page, 'lt_admin_styles');
+	add_action('admin_print_scripts-' . $page, 'lt_admin_scripts');	
+}
+
+function lt_admin_styles() {
+	wp_enqueue_style('lt_tabmenu');
+	wp_enqueue_style('lt_tablesorter');
+}
+
+function lt_admin_scripts() {
+	wp_enqueue_script('lt_idtabs');
+	wp_enqueue_script('lt_FusionCharts');
+	wp_enqueue_script('lt_tablesorter');
+	wp_enqueue_script('lt_js');
+}
+
+function lt_admin_init() {
+	wp_register_script('lt_idtabs', plugins_url( 'js/jquery.idtabs.js', __FILE__ ), array('jquery'));
+	wp_register_script('lt_FusionCharts', plugins_url( 'FusionCharts/FusionCharts.js', __FILE__ ));
+	wp_register_script('lt_tablesorter', plugins_url( 'js/jquery.tablesorter.min.js', __FILE__ ), array('jquery'));
+	wp_register_script('lt_js', plugins_url( 'js/latency.tracker.js', __FILE__ ), array('jquery'));
+	wp_register_style('lt_tabmenu', plugins_url( 'css/tabmenu.css', __FILE__ ));
+	wp_register_style('lt_tablesorter', plugins_url( 'css/jquery.tablesorter.css', __FILE__ ));
 }
 
 // Add admin menu hook
+add_action('admin_init', 'lt_admin_init');
 add_action('admin_menu', 'lt_add_admin_panels');
 
 // Bind to wp_footer() function to track latency and store results
