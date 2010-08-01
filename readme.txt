@@ -2,10 +2,10 @@
 Contributors: sdkester
 Tags: admin, database, performance, tracking
 Requires at least: 2.8
-Tested up to: 2.9.2
-Stable tag: 2.1
+Tested up to: 3.0.1
+Stable tag: 2.2
 
-Keeps track of the queries and loading time of your Wordpress site.
+Keeps track of the queries, loading time, and memory usage of your Wordpress site.
 
 == Description ==
 
@@ -13,7 +13,7 @@ The Latency Tracker plugin counts the number of database calls and speed of your
 
 == Installation ==
 
-1. Upload `latency-tracker` folder to the `/wp-content/plugins/` directory
+1. Upload 'latency-tracker' folder to the '/wp-content/plugins/' directory
 1. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Screenshots ==
@@ -24,6 +24,10 @@ The Latency Tracker plugin counts the number of database calls and speed of your
 
 
 == Changelog ==
+
+= 2.2 =
+* Store and view peak memory usage
+* Added 'Clear all records' button
 
 = 2.1 =
 * Store and view user agent of each request

@@ -3,7 +3,7 @@
 Plugin Name: Latency Tracker
 Plugin URI: http://skfox.com/2008/10/09/latency-tracker-phpmysql-tracking-for-wordpress/
 Description: Keeps track of the queries and time to load Wordpress. <a href="edit.php?page=latency.tracker">View your data</a>.
-Version: 2.1
+Version: 2.2
 Author: Shaun Kester
 Author URI: http://skfox.com
 */
@@ -41,6 +41,7 @@ function lt_install ()
 		id mediumint(16) NOT NULL AUTO_INCREMENT,
 		longdatetime datetime NOT NULL,
 		qcount mediumint(16) NOT NULL,
+		qmemory float NOT NULL,
 		qtime float NOT NULL,
 		qpage varchar(255) NOT NULL,
 		useragent varchar(255) NOT NULL,
@@ -92,6 +93,7 @@ function lt_store_timer_data()
 		'qcount' => get_num_queries(),
 		'qtime' => timer_stop(0,3),
 		'qpage' => "http://".$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'],
+		'qmemory' => round(memory_get_peak_usage() / 1024 / 1024, 3),
 		'useragent' => $_SERVER['HTTP_USER_AGENT']
 	);	
 	$wpdb->insert($table_name, $lt_data);
@@ -109,6 +111,11 @@ function lt_manage_panel()
 		do_action('lt_clear_max');
 		$message = '<div id="message" class="updated fade"><p><strong>The records overage has been cleared</strong></p></div>';
 	}
+	if ( $_REQUEST['doClearAll'] == 'yes' ) {
+		$query = "TRUNCATE TABLE " .$table_name;
+		$query_result = $wpdb->query($query);
+		$message = '<div id="message" class="updated fade"><p><strong>All of the records have been cleared</strong></p></div>';
+	}	
 	
 	// Get the options array
 	$options = get_option('plugin_latencytracker_settings');
@@ -120,8 +127,8 @@ function lt_manage_panel()
 	// Get most recent requests
 	$recent_results = $wpdb->get_results("SELECT * FROM $table_name ORDER BY longdatetime DESC LIMIT 0, $lt_recent_requests");
 
-	// Get min, max, and average for qtime and qcount
-	$statistic = $wpdb->get_row("SELECT max(qtime) as max_time,min(qtime) as min_time,avg(qtime) as avg_time,max(qcount) as max_queries,min(qcount) as min_queries,avg(qcount) as avg_queries FROM $table_name");
+	// Get min, max, and average for qtime, qcount, and qmemory
+	$statistic = $wpdb->get_row("SELECT max(qtime) as max_time,min(qtime) as min_time,avg(qtime) as avg_time,max(qcount) as max_queries,min(qcount) as min_queries,avg(qcount) as avg_queries,max(qmemory) as max_memory,min(qmemory) as min_memory,avg(qmemory) as avg_memory FROM $table_name");
 
 	// Start the page content
 	echo '<div id="divLatencyTrackerContent" class="wrap">';
@@ -144,17 +151,6 @@ function lt_manage_panel()
 	
 	// Data tab
 	echo '<div id="tab1">';
-		// Queries Table
-		echo '<h3>Queries (Database requests)</h3>';
-		echo "<table class='widefat' cellpadding='1' cellspacing='0' border='1'>";
-		echo "<thead><tr> <th>Min</th> <th>Max</th> <th>Average</th> </tr></thead>";
-			echo "<tr>";
-			echo "<td>".number_format($statistic->min_queries)."</td>";
-			echo "<td>".number_format($statistic->max_queries)."</td>";
-			echo "<td>".number_format($statistic->avg_queries)."</td>";
-			echo "</tr>"; 
-		echo "</table>";	
-		
 		// Time Table
 		foreach ($recent_results as $recent_result) 
 		{
@@ -174,6 +170,29 @@ function lt_manage_panel()
 			echo "<td>".number_format($statistic->avg_time,3)."</td>";
 			echo "</tr>"; 
 		echo "</table>";	
+		
+		// Queries Table
+		echo '<h3>Queries (Database requests)</h3>';
+		echo "<table class='widefat' cellpadding='1' cellspacing='0' border='1'>";
+		echo "<thead><tr> <th>Min</th> <th>Max</th> <th>Average</th> </tr></thead>";
+			echo "<tr>";
+			echo "<td>".number_format($statistic->min_queries)."</td>";
+			echo "<td>".number_format($statistic->max_queries)."</td>";
+			echo "<td>".number_format($statistic->avg_queries)."</td>";
+			echo "</tr>"; 
+		echo "</table>";
+		
+		// Memory Table
+		echo '<h3>Memory</h3>';
+		echo "<table class='widefat' cellpadding='1' cellspacing='0' border='1'>";
+		echo "<thead><tr> <th>Min</th> <th>Max</th> <th>Average</th> </tr></thead>";
+			echo "<tr>";
+			echo "<td>".number_format($statistic->min_memory,3)." MB</td>";
+			echo "<td>".number_format($statistic->max_memory,3)." MB</td>";
+			echo "<td>".number_format($statistic->avg_memory,3)." MB</td>";
+			echo "</tr>"; 
+		echo "</table>";		
+		
 	echo '</div>';
 	
 	// Graph tab
@@ -190,7 +209,7 @@ function lt_manage_panel()
 	echo '<div id="tab3">';
 		// Recent Requests Table
 		echo "<table cellpadding='1' cellspacing='0' border='1' id='tblRecentRequests' class='tablesorter'>";
-		echo "<thead><tr><th>Date / Time</th><th>Page</th><th>Queries</th><th>Time</th></tr></thead>";
+		echo "<thead><tr><th>Date / Time</th><th>Page</th><th>Queries</th><th>Memory</th><th>Time</th></tr></thead>";
 		echo '<tbody>';
 		foreach ($recent_results as $recent_result) {
 			$class = 'odd' == $class ? '' : 'odd';
@@ -198,6 +217,7 @@ function lt_manage_panel()
 			echo "<td>".$recent_result->longdatetime."</td>";
 			echo "<td><a href='".$recent_result->qpage."'>".$recent_result->qpage."</a><br>".$recent_result->useragent."</td>";
 			echo "<td>".$recent_result->qcount."</td>";
+			echo "<td>".$recent_result->qmemory." MB</td>";			
 			echo "<td>".$recent_result->qtime."</td>";
 			echo "</tr>";
 		} 
@@ -219,6 +239,10 @@ function lt_manage_panel()
 	{
 		echo '<p><i>Records: '. $record_count .'</i></p>';
 	}
+	echo '<form method="post">';                                            
+	echo '<input type="hidden" name="doClearAll" value="yes">';
+	echo '<p class="submit"><input type="submit" class="button-primary" value="Clear ALL records" /></p>';
+	echo '</form>';			
 	echo '<hr />';
 }
 
